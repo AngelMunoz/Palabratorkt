@@ -11,10 +11,10 @@ import io.ktor.util.pipeline.*
 
 fun Route.profileRoutes(env: ApplicationEnvironment) {
     suspend fun PipelineContext<Unit, ApplicationCall>.extractUser(): User {
-        val principal =
-            call.principal<JWTPrincipal>() ?: throw InvalidClaimValuesException("No Principal in the request")
         val email =
-            principal.payload.getClaim("email")
+            call.principal<JWTPrincipal>()
+                ?.payload
+                ?.getClaim("email")
                 ?: throw InvalidClaimValuesException("The email is missing from the jwt")
         return User.findByEmail(email.asString()) ?: throw UserNotFoundException("Can't find the user from the jwt")
     }
@@ -34,10 +34,10 @@ fun Route.profileRoutes(env: ApplicationEnvironment) {
 
     post("profiles") {
         try {
-            val params = call.receiveOrNull<Map<String, String>>()
-                ?: throw InvalidContentException("Body was not present in the request")
             val name =
-                params["name"] ?: throw InvalidContentException("the profile name was not present in the request")
+                call.receiveOrNull<Map<String, String>>()
+                    ?.get("name")
+                    ?: throw InvalidContentException("the profile name was not present in the request")
             val user = extractUser()
             if (Profile.profileExists(name)) {
                 call.response.status(HttpStatusCode.BadRequest)
