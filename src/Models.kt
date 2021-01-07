@@ -1,9 +1,13 @@
 package me.tunaxor.apps
 
+import com.mongodb.client.model.DeleteOptions
 import org.bson.codecs.pojo.annotations.BsonId
 import org.bson.types.ObjectId
 import org.litote.kmongo.eq
 import org.litote.kmongo.or
+import org.litote.kmongo.MongoOperator.oid
+import org.litote.kmongo.MongoOperator.set
+import org.litote.kmongo.MongoOperator.or
 
 class InvalidClaimValuesException(message: String?) : Exception(message)
 class UserNotFoundException(message: String?): Exception(message)
@@ -15,12 +19,12 @@ data class FailedRequestResponse(val message: String)
 data class PaginationResult<T>(val count: Long, val list: List<T>)
 data class ProfilePayload(val owner: String, val name: String)
 
+fun idFilter (id: String): String {
+    return "{ _id: { $oid: '$id' } }"
+}
+
 data class User(@BsonId val _id: String, val name: String, val lastName: String, val email: String) {
     companion object {
-
-        suspend fun findById(id: String): User? {
-            return palUsers.findOneById(id)
-        }
 
         suspend fun findByEmail(email: String): User? {
             return palUsers.findOne(User::email eq email)
@@ -30,9 +34,11 @@ data class User(@BsonId val _id: String, val name: String, val lastName: String,
         suspend fun checkExists(id: String? = null, email: String? = null): Boolean {
             return when {
                 id != null && email != null ->
-                    palUsers.countDocuments(or(User::_id eq id, User::email eq email)) > 0
+                    palUsers.countDocuments("""
+                        { $or: [ ${idFilter((id))}, { email: '$email' } ] }
+                    """.trimIndent()) > 0
                 id != null ->
-                    palUsers.countDocuments(User::_id eq id) > 0
+                    palUsers.countDocuments(idFilter(id)) > 0
                 email != null ->
                     palUsers.countDocuments(User::email eq email) > 0
                 else -> throw IllegalArgumentException("At least id or email must be present")
@@ -62,6 +68,10 @@ data class SignupPayload(val name: String, val lastName: String, val email: Stri
 
 data class Profile(@BsonId val _id: String, val owner: String, val name: String) {
     companion object {
+        suspend fun exists(name: String): Boolean {
+            return palProfiles.countDocuments(Profile::name eq name) > 0
+        }
+
         suspend fun findProfiles(owner: String, page: Int = 1, limit: Int = 10): PaginationResult<Profile> {
             val filter = Profile::owner eq owner
             val offset = (page - 1) * limit
@@ -70,13 +80,25 @@ data class Profile(@BsonId val _id: String, val owner: String, val name: String)
             return PaginationResult(count, results)
         }
 
-        suspend fun insertProfile(payload: ProfilePayload): Boolean {
+        suspend fun create(payload: ProfilePayload): Boolean {
             val result = palProfiles.withDocumentClass<ProfilePayload>().insertOne(payload)
             return result.wasAcknowledged()
         }
 
-        suspend fun profileExists(name: String): Boolean {
-            return palProfiles.countDocuments(Profile::name eq name) > 0
+        suspend fun rename(id: String, name: String): Boolean {
+            val result = palProfiles.updateOne(
+                idFilter(id),
+                "{ $set: { name: '$name' } }"
+            )
+            return result.wasAcknowledged() && (result.modifiedCount > 0)
+        }
+
+        suspend fun delete(id: String, owner: String): Pair<Boolean, Long> {
+            val result = palProfiles.deleteOne("""
+                { _id: { $oid: '$id' }, owner: '$owner' }
+            """.trimIndent()
+            )
+            return Pair(result.wasAcknowledged(), result.deletedCount)
         }
     }
 }
