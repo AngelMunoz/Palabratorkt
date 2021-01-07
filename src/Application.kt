@@ -85,6 +85,11 @@ fun Application.module(testing: Boolean = false) {
 
     routing {
         authRoutes(environment)
+        authenticate {
+            route("/api") {
+                profileRoutes(environment)
+            }
+        }
     }
 }
 

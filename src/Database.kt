@@ -10,4 +10,5 @@ private val client = KMongo.createClient(dburl).coroutine
 private val database = client.getDatabase("palabrator")
 
 val palUsers = database.getCollection<User>("pal_users")
+val palProfiles = database.getCollection<Profile>("pal_profiles")
 
