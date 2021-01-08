@@ -88,6 +88,7 @@ fun Application.module(testing: Boolean = false) {
         authenticate {
             route("/api") {
                 profileRoutes(environment)
+                wordRoutes(environment)
             }
         }
     }

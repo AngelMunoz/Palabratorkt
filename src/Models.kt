@@ -1,10 +1,8 @@
 package me.tunaxor.apps
 
-import com.mongodb.client.model.DeleteOptions
 import org.bson.codecs.pojo.annotations.BsonId
-import org.bson.types.ObjectId
 import org.litote.kmongo.eq
-import org.litote.kmongo.or
+import org.litote.kmongo.and
 import org.litote.kmongo.MongoOperator.oid
 import org.litote.kmongo.MongoOperator.set
 import org.litote.kmongo.MongoOperator.or
@@ -47,32 +45,13 @@ data class User(@BsonId val _id: String, val name: String, val lastName: String,
     }
 }
 
-data class LoginPayload(val email: String, val password: String) {
-    companion object {
-        suspend fun findByEmail(email: String): LoginPayload? {
-            return palUsers
-                .withDocumentClass<LoginPayload>()
-                .findOne(LoginPayload::email eq email)
-        }
-    }
-}
-
-data class SignupPayload(val name: String, val lastName: String, val email: String, val password: String) {
-    companion object {
-        suspend fun createUser(payload: SignupPayload): Boolean {
-            val result = palUsers.withDocumentClass<SignupPayload>().insertOne(payload)
-            return result.wasAcknowledged()
-        }
-    }
-}
-
 data class Profile(@BsonId val _id: String, val owner: String, val name: String) {
     companion object {
         suspend fun exists(name: String): Boolean {
             return palProfiles.countDocuments(Profile::name eq name) > 0
         }
 
-        suspend fun findProfiles(owner: String, page: Int = 1, limit: Int = 10): PaginationResult<Profile> {
+        suspend fun find(owner: String, page: Int = 1, limit: Int = 10): PaginationResult<Profile> {
             val filter = Profile::owner eq owner
             val offset = (page - 1) * limit
             val count = palProfiles.countDocuments(filter)
@@ -103,3 +82,51 @@ data class Profile(@BsonId val _id: String, val owner: String, val name: String)
     }
 }
 
+data class Word(@BsonId val _id: String, val owner: String, val name: String, val profile: String?, val image: String?, val animation: String) {
+    companion object {
+        suspend fun existsForUser(name: String, owner: String): Boolean {
+            return palWords.countDocuments(
+                and(
+                    Word::name eq name,
+                    Word::owner eq owner
+                )
+            ) > 0
+        }
+
+        suspend fun existsForProfile(name: String, profile: String): Boolean {
+            return palWords.countDocuments(
+                and(
+                    Word::name eq name,
+                    Word::profile eq profile
+                )
+            ) > 0
+        }
+
+        suspend fun create(payload: WordPayload) {
+
+
+        }
+    }
+}
+
+
+data class WordPayload(val owner: String, val name: String, val profile: String?, val image: String?, val animation: String)
+
+data class LoginPayload(val email: String, val password: String) {
+    companion object {
+        suspend fun findByEmail(email: String): LoginPayload? {
+            return palUsers
+                .withDocumentClass<LoginPayload>()
+                .findOne(LoginPayload::email eq email)
+        }
+    }
+}
+
+data class SignupPayload(val name: String, val lastName: String, val email: String, val password: String) {
+    companion object {
+        suspend fun createUser(payload: SignupPayload): Boolean {
+            val result = palUsers.withDocumentClass<SignupPayload>().insertOne(payload)
+            return result.wasAcknowledged()
+        }
+    }
+}
